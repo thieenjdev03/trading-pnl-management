@@ -81,6 +81,88 @@ function App() {
     console.log('Data exported successfully');
   };
 
+  // Handle edit transaction
+  const handleEditTransaction = (updatedTransaction) => {
+    try {
+      // Find the entry that contains this transaction
+      const entryIndex = data.findIndex(entry => 
+        entry.date === updatedTransaction.date && 
+        entry.accounts[updatedTransaction.account]
+      );
+
+      if (entryIndex === -1) {
+        throw new Error('Không tìm thấy giao dịch cần chỉnh sửa');
+      }
+
+      // Create updated data
+      const newData = [...data];
+      
+      // If account name changed, we need to handle it differently
+      const originalEntry = newData[entryIndex];
+      const originalAccountName = Object.keys(originalEntry.accounts).find(account => 
+        account === updatedTransaction.account
+      );
+
+      if (originalAccountName !== updatedTransaction.account) {
+        // Account name changed - remove old account and add new one
+        delete newData[entryIndex].accounts[originalAccountName];
+      }
+
+      // Update the account data
+      newData[entryIndex].accounts[updatedTransaction.account] = {
+        balance: updatedTransaction.balance,
+        deposit: updatedTransaction.deposit,
+        withdraw: updatedTransaction.withdraw
+      };
+
+      // Sort by date
+      const sortedData = newData.sort((a, b) => new Date(a.date) - new Date(b.date));
+      
+      // Save updated data
+      saveData(sortedData);
+      
+      alert('Giao dịch đã được cập nhật thành công!');
+    } catch (error) {
+      console.error('Error editing transaction:', error);
+      alert(`Lỗi khi cập nhật giao dịch: ${error.message}`);
+    }
+  };
+
+  // Handle delete transaction
+  const handleDeleteTransaction = (transactionToDelete) => {
+    try {
+      // Find the entry that contains this transaction
+      const entryIndex = data.findIndex(entry => 
+        entry.date === transactionToDelete.date && 
+        entry.accounts[transactionToDelete.account]
+      );
+
+      if (entryIndex === -1) {
+        throw new Error('Không tìm thấy giao dịch cần xóa');
+      }
+
+      // Create updated data
+      const newData = [...data];
+      const entry = newData[entryIndex];
+      
+      // Remove the account from this entry
+      delete entry.accounts[transactionToDelete.account];
+      
+      // If this entry has no accounts left, remove the entire entry
+      if (Object.keys(entry.accounts).length === 0) {
+        newData.splice(entryIndex, 1);
+      }
+
+      // Save updated data
+      saveData(newData);
+      
+      alert('Giao dịch đã được xóa thành công!');
+    } catch (error) {
+      console.error('Error deleting transaction:', error);
+      alert(`Lỗi khi xóa giao dịch: ${error.message}`);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
@@ -136,7 +218,11 @@ function App() {
               </button>
             </div>
           </div>
-          <PnLTable data={data} />
+          <PnLTable 
+            data={data} 
+            onEditTransaction={handleEditTransaction}
+            onDeleteTransaction={handleDeleteTransaction}
+          />
         </div>
       </div>
     </div>

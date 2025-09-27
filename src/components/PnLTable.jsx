@@ -1,9 +1,29 @@
 import React, { useState, useMemo } from 'react';
+import EditTransactionModal from './EditTransactionModal';
 
-const PnLTable = ({ data }) => {
+const PnLTable = ({ data, onEditTransaction, onDeleteTransaction }) => {
   const [filterAccount, setFilterAccount] = useState('');
   const [filterDateFrom, setFilterDateFrom] = useState('');
   const [filterDateTo, setFilterDateTo] = useState('');
+  const [editingTransaction, setEditingTransaction] = useState(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+
+  // Set default filter to last 1 month
+  React.useEffect(() => {
+    if (data.length > 0) {
+      const today = new Date();
+      const oneMonthAgo = new Date();
+      oneMonthAgo.setMonth(today.getMonth() - 1);
+      
+      // Format dates for input
+      const formatDate = (date) => {
+        return date.toISOString().split('T')[0];
+      };
+      
+      setFilterDateFrom(formatDate(oneMonthAgo));
+      setFilterDateTo(formatDate(today));
+    }
+  }, [data]);
 
   // Get all unique accounts
   const allAccounts = useMemo(() => {
@@ -87,37 +107,68 @@ const PnLTable = ({ data }) => {
     return flattened.sort((a, b) => new Date(a.date) - new Date(b.date));
   }, [filteredData, data]);
 
-  // Calculate totals
+  // Calculate totals based on filtered data
   const totals = useMemo(() => {
     const accountTotals = {};
     
-    allAccounts.forEach(accountName => {
+    // Get accounts that appear in filtered data
+    const filteredAccounts = new Set();
+    filteredData.forEach(entry => {
+      Object.keys(entry.accounts).forEach(account => filteredAccounts.add(account));
+    });
+    
+    filteredAccounts.forEach(accountName => {
+      // Get all entries for this account (not just filtered ones)
       const accountEntries = data.filter(entry => entry.accounts[accountName]);
       if (accountEntries.length === 0) return;
 
+      // Find the first entry for this account (initial balance)
       const firstEntry = accountEntries[0];
       const initialBalance = firstEntry.accounts[accountName].balance;
       
-      const lastEntry = accountEntries[accountEntries.length - 1];
-      const currentBalance = lastEntry.accounts[accountName].balance;
+      // Find the last entry within the filtered date range
+      const filteredAccountEntries = filteredData.filter(entry => entry.accounts[accountName]);
+      if (filteredAccountEntries.length === 0) return;
       
-      const totalDeposits = accountEntries.reduce((sum, entry) => 
+      const lastFilteredEntry = filteredAccountEntries[filteredAccountEntries.length - 1];
+      const currentBalance = lastFilteredEntry.accounts[accountName].balance;
+      
+      // Calculate deposits and withdrawals only within the filtered period
+      const totalDeposits = filteredAccountEntries.reduce((sum, entry) => 
         sum + (entry.accounts[accountName]?.deposit || 0), 0);
       
-      const totalWithdrawals = accountEntries.reduce((sum, entry) => 
+      const totalWithdrawals = filteredAccountEntries.reduce((sum, entry) => 
         sum + (entry.accounts[accountName]?.withdraw || 0), 0);
 
+      // Calculate P&L for the filtered period
+      // For filtered period, we need to find the balance at the start of the period
+      const startOfPeriodBalance = (() => {
+        if (filterDateFrom) {
+          const startDate = new Date(filterDateFrom);
+          const entriesBeforePeriod = accountEntries.filter(entry => 
+            new Date(entry.date) < startDate
+          );
+          if (entriesBeforePeriod.length > 0) {
+            const lastEntryBeforePeriod = entriesBeforePeriod[entriesBeforePeriod.length - 1];
+            return lastEntryBeforePeriod.accounts[accountName].balance;
+          }
+        }
+        return initialBalance;
+      })();
+
       accountTotals[accountName] = {
-        initialBalance,
+        initialBalance: startOfPeriodBalance,
         currentBalance,
         totalDeposits,
         totalWithdrawals,
-        totalPnL: currentBalance + totalWithdrawals - totalDeposits - initialBalance
+        totalPnL: currentBalance + totalWithdrawals - totalDeposits - startOfPeriodBalance,
+        periodStart: filterDateFrom || 'Tất cả',
+        periodEnd: filterDateTo || 'Hiện tại'
       };
     });
 
     return accountTotals;
-  }, [data, allAccounts]);
+  }, [data, filteredData, allAccounts, filterDateFrom, filterDateTo]);
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('vi-VN', {
@@ -128,6 +179,36 @@ const PnLTable = ({ data }) => {
 
   const formatNumber = (amount) => {
     return new Intl.NumberFormat('vi-VN').format(amount);
+  };
+
+  // Handle edit transaction
+  const handleEditTransaction = (transaction) => {
+    setEditingTransaction(transaction);
+    setIsEditModalOpen(true);
+  };
+
+  // Handle save edited transaction
+  const handleSaveTransaction = (updatedTransaction) => {
+    if (onEditTransaction) {
+      onEditTransaction(updatedTransaction);
+    }
+    setIsEditModalOpen(false);
+    setEditingTransaction(null);
+  };
+
+  // Handle delete transaction
+  const handleDeleteTransaction = (transaction) => {
+    if (onDeleteTransaction) {
+      onDeleteTransaction(transaction);
+    }
+    setIsEditModalOpen(false);
+    setEditingTransaction(null);
+  };
+
+  // Handle close modal
+  const handleCloseModal = () => {
+    setIsEditModalOpen(false);
+    setEditingTransaction(null);
   };
 
   return (
@@ -201,6 +282,9 @@ const PnLTable = ({ data }) => {
               <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                 P&L tích lũy
               </th>
+              <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Thao tác
+              </th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
@@ -231,6 +315,17 @@ const PnLTable = ({ data }) => {
                 }`}>
                   {row.cumulativePnL > 0 ? '+' : ''}{formatNumber(row.cumulativePnL.toFixed(2))}
                 </td>
+                <td className="px-6 py-4 whitespace-nowrap text-center">
+                  <button
+                    onClick={() => handleEditTransaction(row)}
+                    className="text-blue-600 hover:text-blue-800 transition-colors p-1"
+                    title="Chỉnh sửa giao dịch"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    </svg>
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>
@@ -240,18 +335,23 @@ const PnLTable = ({ data }) => {
       {/* Summary */}
       {Object.keys(totals).length > 0 && (
         <div className="mt-6 p-4 bg-blue-50 rounded-lg">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Tổng hợp theo tài khoản</h3>
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-semibold text-gray-900">Tổng hợp theo tài khoản</h3>
+            <div className="text-sm text-gray-600">
+              <span className="font-medium">Khoảng thời gian:</span> {totals[Object.keys(totals)[0]]?.periodStart} - {totals[Object.keys(totals)[0]]?.periodEnd}
+            </div>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {Object.entries(totals).map(([accountName, totals]) => (
               <div key={accountName} className="bg-white p-4 rounded-lg shadow-sm">
                 <h4 className="font-medium text-gray-900 mb-2">{accountName}</h4>
                 <div className="space-y-1 text-sm">
                   <div className="flex justify-between">
-                    <span className="text-gray-600">Vốn ban đầu:</span>
+                    <span className="text-gray-600">Số dư đầu kỳ:</span>
                     <span className="font-medium">{formatNumber(totals.initialBalance)}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-600">Số dư hiện tại:</span>
+                    <span className="text-gray-600">Số dư cuối kỳ:</span>
                     <span className="font-medium">{formatNumber(totals.currentBalance)}</span>
                   </div>
                   <div className="flex justify-between">
@@ -263,7 +363,7 @@ const PnLTable = ({ data }) => {
                     <span className="text-red-600">-{formatNumber(totals.totalWithdrawals)}</span>
                   </div>
                   <div className="flex justify-between border-t pt-1">
-                    <span className="font-medium text-gray-900">P&L tổng:</span>
+                    <span className="font-medium text-gray-900">P&L kỳ:</span>
                     <span className={`font-bold ${
                       totals.totalPnL > 0 ? 'text-green-600' : totals.totalPnL < 0 ? 'text-red-600' : 'text-gray-900'
                     }`}>
@@ -276,6 +376,16 @@ const PnLTable = ({ data }) => {
           </div>
         </div>
       )}
+
+      {/* Edit Transaction Modal */}
+      <EditTransactionModal
+        isOpen={isEditModalOpen}
+        onClose={handleCloseModal}
+        transaction={editingTransaction}
+        onSave={handleSaveTransaction}
+        onDelete={handleDeleteTransaction}
+        existingAccounts={allAccounts}
+      />
     </div>
   );
 };

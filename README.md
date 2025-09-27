@@ -8,6 +8,7 @@
 - 💾 **Hybrid data storage**: Load từ JSON ban đầu, lưu mới vào localStorage
 - 📈 **Tính toán P&L tự động**: P&L ngày và P&L tích lũy
 - 📅 **Lọc dữ liệu**: Theo ngày và theo tài khoản
+- ✏️ **Chỉnh sửa giao dịch**: Sửa đổi hoặc xóa các giao dịch đã nhập
 - 🔄 **Reset dữ liệu**: Về dữ liệu gốc từ JSON
 - 💾 **Export/Import JSON**: Backup và restore dữ liệu
 - 📱 **Responsive design**: Hoạt động tốt trên mọi thiết bị
@@ -34,11 +35,12 @@
 ```
 src/
 ├── components/
-│   ├── PnLForm.jsx        # Form nhập dữ liệu mới
-│   ├── PnLTable.jsx       # Bảng hiển thị lịch sử
-│   ├── SummaryCard.jsx    # Card tổng hợp
-│   ├── DataExportBtn.jsx  # Nút export JSON
-│   └── DataImportBtn.jsx  # Nút import JSON
+│   ├── PnLForm.jsx              # Form nhập dữ liệu mới
+│   ├── PnLTable.jsx             # Bảng hiển thị lịch sử
+│   ├── SummaryCard.jsx          # Card tổng hợp
+│   ├── DataExportBtn.jsx        # Nút export JSON
+│   ├── DataImportBtn.jsx        # Nút import JSON
+│   └── EditTransactionModal.jsx # Modal chỉnh sửa giao dịch
 ├── data/
 │   └── pnlData.json       # Dữ liệu mẫu ban đầu
 ├── App.jsx
@@ -52,9 +54,10 @@ src/
 2. **Nhập dữ liệu mới**: Sử dụng form ở trên để nhập ngày, tài khoản, số dư, nạp/rút
 3. **Xem báo cáo**: Bảng dưới hiển thị toàn bộ lịch sử với P&L được tính tự động
 4. **Lọc dữ liệu**: Sử dụng các filter để xem dữ liệu theo tài khoản hoặc khoảng thời gian
-5. **Export dữ liệu**: Nhấn nút "Save Data as JSON" để tải file JSON về máy
-6. **Import dữ liệu**: Nhấn nút "Import JSON" để nạp dữ liệu từ file JSON
-7. **Reset dữ liệu**: Nhấn nút "Reset về dữ liệu gốc" để xóa localStorage và load lại từ JSON
+5. **Chỉnh sửa giao dịch**: Nhấn nút edit (✏️) trong bảng để sửa đổi hoặc xóa giao dịch
+6. **Export dữ liệu**: Nhấn nút "Save Data as JSON" để tải file JSON về máy
+7. **Import dữ liệu**: Nhấn nút "Import JSON" để nạp dữ liệu từ file JSON
+8. **Reset dữ liệu**: Nhấn nút "Reset về dữ liệu gốc" để xóa localStorage và load lại từ JSON
 
 ## Tính năng Export/Import
 
@@ -74,6 +77,26 @@ src/
 - **Mục đích**: Quay về dữ liệu gốc ban đầu từ `/src/data/pnlData.json`
 - **Cách dùng**: Nhấn nút "Reset về dữ liệu gốc"
 - **Lưu ý**: Sẽ xóa toàn bộ dữ liệu trong localStorage
+
+## Tính năng Chỉnh sửa Giao dịch
+
+### Edit Transaction
+- **Mục đích**: Sửa đổi thông tin giao dịch đã nhập
+- **Cách dùng**: Nhấn nút edit (✏️) trong cột "Thao tác" của bảng
+- **Tính năng**: 
+  - Sửa ngày, tài khoản, số dư, nạp/rút
+  - Thay đổi tên tài khoản (tạo tài khoản mới nếu cần)
+  - Validation dữ liệu trước khi lưu
+- **Lưu ý**: Thay đổi sẽ được lưu vào localStorage và cập nhật P&L tự động
+
+### Delete Transaction
+- **Mục đích**: Xóa giao dịch không cần thiết
+- **Cách dùng**: Nhấn nút "Xóa giao dịch" trong modal chỉnh sửa
+- **Tính năng**:
+  - Xác nhận trước khi xóa
+  - Xóa toàn bộ entry nếu không còn tài khoản nào
+  - Cập nhật P&L tự động sau khi xóa
+- **Lưu ý**: Hành động này không thể hoàn tác
 
 ## Công nghệ sử dụng
 
